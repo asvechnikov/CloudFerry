@@ -43,6 +43,40 @@ class NovaCompute(compute.Compute):
                                   params["tenant"],
                                   "http://%s:35357/v2.0/" % params["host"])
 
+    def read_info(self, instances_name=None):
+        resource = {'instances': [],
+                    'flavors': self.get_flavor_list()}
+        for instance in self.get_instances_list():
+            if instances_name and instance.name not in instances_name:
+                continue
+            instance_info = {'name': instance.name,
+                             'id': instance.id,
+                             'status': instance.status}
+            instance_info['flavor']['id'] = instance.flavor['id']
+            resource['instances'].append(instance_info)
+        return resource
+
+    def deploy(self, resource):
+        self.__deploy_flavors(resource['flavors'])
+        self.__deploy_instances(resource['instances'])
+
+    def __deploy_flavors(self, flavors):
+        for flavor in flavors:
+            self.create_flavor(name=flavor.name, ram=flavor.ram,
+                               vcpus=flavor.vcpus, disk=flavor.disk,
+                               ephemeral=flavor.ephemeral, swap=flavor.swap,
+                               rxtx_factor=flavor.rxtx_factor,
+                               is_public=flavor.is_public)
+
+    def __deploy_instances(self, instances):
+        for instance in instances:
+            self.create_instance(name=instance['name'],
+                                 image=instance['image']['id'],
+                                 flavor=instance['flavor']['id'],
+                                 security_groups=instance['security_groups'],
+                                 availability_zone=instance['availability_zone'],
+                                 nics=instance['nics'])
+
     def create_instance(self, **kwargs):
         self.instance = self.nova_client.servers.create(**kwargs)
         return self.instance.id
